@@ -1,16 +1,14 @@
 # Logstash Plugin
 
-[![Travis Build Status](https://travis-ci.com/logstash-plugins/logstash-filter-example.svg)](https://travis-ci.com/logstash-plugins/logstash-filter-example)
-
 This is a plugin for [Logstash](https://github.com/elastic/logstash).
 
 It is fully free and fully open source. The license is Apache 2.0, meaning you are pretty much free to use it however you want in whatever way.
 
 ## Documentation
 
-Logstash provides infrastructure to automatically build documentation for this plugin. We provide a template file, index.asciidoc, where you can add documentation. The contents of this file will be converted into html and then placed with other plugin documentation in a [central location](http://www.elastic.co/guide/en/logstash/current/).
+Logstash provides infrastructure to automatically generate documentation for this plugin. We use the asciidoc format to write documentation so any comments in the source code will be first converted into asciidoc and then into html. All plugin documentation are placed under one [central location](http://www.elastic.co/guide/en/logstash/current/).
 
-- For formatting config examples, you can use the asciidoc `[source,json]` directive
+- For formatting code or config example, you can use the asciidoc `[source,ruby]` directive
 - For more asciidoc formatting tips, see the excellent reference here https://github.com/elastic/docs#asciidoc-guide
 
 ## Need Help?
@@ -55,12 +53,7 @@ gem "logstash-filter-awesome", :path => "/your/local/logstash-filter-awesome"
 ```
 - Install plugin
 ```sh
-# Logstash 2.3 and higher
 bin/logstash-plugin install --no-verify
-
-# Prior to Logstash 2.3
-bin/plugin install --no-verify
-
 ```
 - Run Logstash with your plugin
 ```sh
@@ -78,12 +71,7 @@ gem build logstash-filter-awesome.gemspec
 ```
 - Install the plugin from the Logstash home
 ```sh
-# Logstash 2.3 and higher
-bin/logstash-plugin install --no-verify
-
-# Prior to Logstash 2.3
-bin/plugin install --no-verify
-
+bin/logstash-plugin install /your/local/plugin/logstash-filter-awesome.gem
 ```
 - Start Logstash and proceed to test the plugin
 
