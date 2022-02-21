@@ -55,6 +55,8 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 	ospf_ospf_metric_index = 0
 	ospf_ospf_v2_options_dn_index = 0
 	ospf_ospf_v2_options_e_index = 0
+	ospf_ospf_lsa_asext_netmask_index = 0
+	ospf_ospf_lsa_asext_type_index = 0
 	index_type_10 = 0
 	index_type_3 = 0
     
@@ -64,15 +66,13 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
       
         renameCommonFields(cloned_event, event)
       
-        removeUnusedFields(cloned_event)
-        
         # concat frame_frame_time_epoch-ospf_ospf_area_id-ospf_ospf_srcrouter
-        lsu_pointer = sprintf("%s-%s-%s", event.get("[json_parsed][layers][frame][frame_frame_time_epoch]"),event.get("[json_parsed][layers][ospf][ospf_ospf_area_id]"),event.get("[json_parsed][layers][ospf][ospf_ospf_srcrouter]"))
+        lsu_pointer = sprintf("%s-%s-%s", event.get("[json_parsed][layers][frame][frame_frame_time_epoch]"),cloned_event.get("[ospf][area_id]"),event.get("[json_parsed][layers][ospf][ospf_ospf_srcrouter]"))
         cloned_event.set("[ospf][lsu_pointer]", lsu_pointer)
         
         renameSpecificField(cloned_event, "[ospf][lsa_age]", "[json_parsed][layers][ospf][ospf_ospf_lsa_age]",  fields["ospf_ospf_lsa_age"][lsa_index.to_i])
         renameSpecificField(cloned_event, "[ospf][lsa_type]", "[json_parsed][layers][ospf][ospf_ospf_lsa]",  fields["ospf_ospf_lsa"][lsa_index.to_i])
-        renameSpecificField(cloned_event, "[ospf][lsa_seqnum]", "[json_parsed][layers][ospf][ospf_ospf_lsa_seqnum]",  fields["ospf_ospf_lsa_seqnum"][lsa_index.to_i])
+        renameSpecificField(cloned_event, "[ospf][lsa_seqnum]", "[json_parsed][layers][ospf][ospf_ospf_lsa_seqnum]",  fields["ospf_ospf_lsa_seqnum"][lsa_index.to_i].to_i(16))
         
         setDefaultValues(cloned_event)
 
@@ -115,6 +115,18 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 			cloned_event.set("[ospf][lsa_external_bit]", fields["ospf_ospf_v2_options_e"][ospf_ospf_v2_options_e_index])
 			ospf_ospf_v2_options_e_index += 1
 		end
+	
+		# handling field ospf_ospf_lsa_asext_netmask
+		if ["5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][netmask]", fields["ospf_ospf_lsa_asext_netmask"][ospf_ospf_lsa_asext_netmask_index])
+			ospf_ospf_lsa_asext_netmask_index += 1
+		end
+	
+		# handling field ospf_ospf_lsa_asext_netmask
+		if ["5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][metric_type]", fields["ospf_ospf_lsa_asext_type"][ospf_ospf_lsa_asext_type_index])
+			ospf_ospf_lsa_asext_type_index += 1
+		end
 
         if lsa_type == "1"
 
@@ -142,7 +154,7 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 		
         elsif lsa_type == "2"
 
-            events.push(cloned_event)
+            # events.push(cloned_event)
 
         elsif lsa_type == "3"
 
@@ -152,7 +164,7 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 
         elsif lsa_type == "4"
 
-            events.push(cloned_event)
+            # events.push(cloned_event)
 
         elsif lsa_type == "5"
 
@@ -160,21 +172,21 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
             
         elsif lsa_type == "7"
 
-            events.push(cloned_event)    
+            # events.push(cloned_event)    
 
         elsif lsa_type == "9"
 
-            events.push(cloned_event)
+            # events.push(cloned_event)
 
         elsif lsa_type == "10"
 
-            events.push(cloned_event)
+            # events.push(cloned_event)
             
             index_type_10 += 1
 
         elsif lsa_type == "11"
 
-            events.push(cloned_event)
+            # events.push(cloned_event)
 
         else
             logger.info("TYPE UNKNOWN")
@@ -205,87 +217,43 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 
   def hasNoPackets(ospf_ospf_ls_number_of_lsas)
   	logger.info("ospf_ospf_ls_number_of_lsas:", "value" => ospf_ospf_ls_number_of_lsas)
-    if ospf_ospf_ls_number_of_lsas == "0"
+    if ["0", nil].include? ospf_ospf_ls_number_of_lsas
         logger.info("no lsa, drop message")
         return true
     end
     return false
   end
  
-  def removeUnusedFields(cloned_event)
-    cloned_event.remove("[json_parsed][layers][sll]")
-    cloned_event.remove("[json_parsed][layers][ip]")
-    cloned_event.remove("[json_parsed][layers][frame]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_header]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_version]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_msg]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_msg_lsupdate]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_packet_length]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_checksum]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_auth_type]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_auth_none]")
-    cloned_event.remove("[json_parsed][layers][ospf][text]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_o]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_dc]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_l]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_n]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_mc]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_options_mt]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_summary]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_chksum]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_length]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_tos]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_asext]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_nssa]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_opaque]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_h]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_n]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_w]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_v]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_e]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_v2_router_lsa_flags_b]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router_nummetrics]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsid_te_lsa_reserved]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsid_te_lsa_instance]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_tlv_type]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_tlv_length]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_mpls_remote_addr]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_mpls_link_max_bw]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_mpls_pri]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_ls_number_of_lsas]")  	
-  end
-
   def renameCommonFields(cloned_event, event)
-    cloned_event.set("[[ospf][timestamp]" , event.get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
+    cloned_event.set("[ospf][timestamp]" , event.get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
 	cloned_event.remove("[json_parsed][layers][frame][frame_frame_time_epoch]")
 	
-	cloned_event.set("[[ospf][utc_time]" , event.get("[json_parsed][layers][frame][frame_frame_time]"))
+	cloned_event.set("[ospf][utc_time]" , event.get("[json_parsed][layers][frame][frame_frame_time]"))
 	cloned_event.remove("[json_parsed][layers][frame][frame_frame_time]")
 	
-	cloned_event.set("[[ospf][area_id]" , event.get("[json_parsed][layers][ospf][ospf_ospf_area_id]"))
-	cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_area_id]")  	
+	# ip address: x.y.z.t => area_id = (x * 16.777.216 + y * 65536 + z * 256 + t) 
+	area_id = event.get("[json_parsed][layers][ospf][ospf_ospf_area_id]").split(".").map { |i| i.to_i }.reverse.inject([]) { |memo,part| memo << part * (256 ** memo.size) }.inject(0) { |memo, part|memo += part }
+	cloned_event.set("[ospf][area_id]" , area_id)
+	cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_area_id]")
   end
 
   def setDefaultValues(cloned_event)
-    cloned_event.set("[[ospf][metric_type]", nil)
-    cloned_event.set("[[ospf][adv_router]", nil)
-    cloned_event.set("[[ospf][prefix-id]", nil)
-    cloned_event.set("[[ospf][link-id]", nil)
-    cloned_event.set("[[ospf][netmask]", nil)
-    cloned_event.set("[[ospf][link_type]", nil)
-    cloned_event.set("[[ospf][ospf_metric]", nil)
-    cloned_event.set("[[ospf][prefix_ip_fwdaddr]", nil)
-    cloned_event.set("[[ospf][ospf_external_tag]", nil)
-    cloned_event.set("[[ospf][lsa_down_bit]", nil)
-    cloned_event.set("[[ospf][lsa_external_bit]", nil)
-    cloned_event.set("[[ospf][lsa_propagate_bit]", nil)
-    cloned_event.set("[[ospf][lsa_opaque_type]", nil)
-    cloned_event.set("[[ospf][te_metric]", nil)
-    cloned_event.set("[[ospf][mpls_linkcolor]", nil)
-    cloned_event.set("[[ospf][extra]", nil)
+    cloned_event.set("[ospf][metric_type]", nil)
+    cloned_event.set("[ospf][adv_router]", nil)
+    cloned_event.set("[ospf][prefix-id]", nil)
+    cloned_event.set("[ospf][link-id]", nil)
+    cloned_event.set("[ospf][netmask]", nil)
+    cloned_event.set("[ospf][link_type]", nil)
+    cloned_event.set("[ospf][ospf_metric]", nil)
+    cloned_event.set("[ospf][prefix_ip_fwdaddr]", nil)
+    cloned_event.set("[ospf][ospf_external_tag]", nil)
+    cloned_event.set("[ospf][lsa_down_bit]", nil)
+    cloned_event.set("[ospf][lsa_external_bit]", nil)
+    cloned_event.set("[ospf][lsa_propagate_bit]", nil)
+    cloned_event.set("[ospf][lsa_opaque_type]", nil)
+    cloned_event.set("[ospf][te_metric]", nil)
+    cloned_event.set("[ospf][mpls_linkcolor]", nil)
+    cloned_event.set("[ospf][extra]", "")
   end
  
   def getArrayFromEvent(event, ospf_ospf_ls_number_of_lsas, key)
@@ -339,17 +307,7 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
   end
  
   def removeUnusedFieldsAfterUsing(cloned_event)
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_srcrouter]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_advrouter]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linkid]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linkdata]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linktype]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_router_metric0]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_id]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_asbr_netmask]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_metric]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_asext_netmask]")
-    cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_lsa_number_of_links]")
+    cloned_event.remove("[json_parsed]")
   end
  
 end # class LogStash::Filters::Ospfpackets
