@@ -57,11 +57,19 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 	ospf_ospf_v2_options_e_index = 0
 	ospf_ospf_lsa_asext_netmask_index = 0
 	ospf_ospf_lsa_asext_type_index = 0
-	index_type_10 = 0
-	index_type_3 = 0
+	ospf_ospf_lsa_asext_fwdaddr_index = 0
+	ospf_ospf_lsa_asext_extrttag_index = 0
+	ospf_ospf_lsid_opaque_type_index = 0
+	ospf_ospf_v2_options_p_index = 0
+	ospf_ospf_lsa_asbr_netmask_index = 0
     
     fields["ospf_ospf_lsa"].each_with_index do |lsa_type,lsa_index|
       
+        if ["1","2","4","9","11"].include?(lsa_type) 
+        	logger.info("SKIP EVENT TYPE:", "value" => lsa_type)
+        	next
+       	end 
+       
         cloned_event = event.clone
       
         renameCommonFields(cloned_event, event)
@@ -76,17 +84,27 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
         
         setDefaultValues(cloned_event)
 
-		# handling field ospf_ospf_advrouter
-		if ["1","3","5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][adv_router]", fields["ospf_ospf_advrouter"][lsa_index.to_i])
+		# handling field ospf_ospf_lsid_opaque_type
+		if ["10"].include?(lsa_type)
+			cloned_event.set("[ospf][lsa_opaque_type]", getValueFromArray(fields["ospf_ospf_lsid_opaque_type"],ospf_ospf_lsid_opaque_type_index, false))
+			current_lsa_opaque_type = cloned_event.get("[ospf][lsa_opaque_type]")
+			ospf_ospf_lsid_opaque_type_index += 1
 		end
 
+		# handling field ospf_ospf_mpls_routerid
+		if ["10"].include?(lsa_type) and current_lsa_opaque_type == "1"
+			renameType10OpaqueType1CommonFields(cloned_event,fields)
+		end
+	
+		# handling field ospf_ospf_advrouter
+		if ["1","3","5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][adv_router]", getValueFromArray(fields["ospf_ospf_advrouter"],lsa_index.to_i, false))
+		end
+	
 		# handling field prefix-id
-		if ["1","3","5","7","10"].include?(lsa_type)
+		if ["1","3","5","7"].include?(lsa_type)
 			if ["3","5","7"].include?(lsa_type)
-			  cloned_event.set("[ospf][prefix-id]", fields["ospf_ospf_lsa_id"][ospf_ospf_lsa_id_index])
-			elsif lsa_type == "10"
-			  cloned_event.set("[ospf][prefix-id]", fields["ospf_ospf_mpls_local_addr"][index_type_10])
+		  	    cloned_event.set("[ospf][prefix-id]", getValueFromArray(fields["ospf_ospf_lsa_id"],ospf_ospf_lsa_id_index, false))
 			elsif lsa_type == "1"
 			end
 		    # incremented for all lsa_types
@@ -95,36 +113,55 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 
 		# handling field ospf_ospf_lsa_asbr_netmask
 		if ["3"].include?(lsa_type)
-			cloned_event.set("[ospf][netmask]", fields["ospf_ospf_lsa_asbr_netmask"][index_type_3])
+			cloned_event.set("[ospf][netmask]", getValueFromArray(fields["ospf_ospf_lsa_asbr_netmask"],ospf_ospf_lsa_asbr_netmask_index, false))
+			ospf_ospf_lsa_asbr_netmask_index += 1
+		end
+	
+		# handling field ospf_ospf_v2_options_p
+		if ["7"].include?(lsa_type)
+			cloned_event.set("[ospf][lsa_propagate_bit]", getValueFromArray(fields["ospf_ospf_v2_options_p"],ospf_ospf_v2_options_p_index, false))
+			ospf_ospf_v2_options_p_index += 1
+		end
+	
+		# handling field ospf_ospf_lsa_asext_netmask
+		if ["5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][netmask]", getValueFromArray(fields["ospf_ospf_lsa_asext_netmask"],ospf_ospf_lsa_asext_netmask_index, false))
+			ospf_ospf_lsa_asext_netmask_index += 1
+		end
+	
+		# handling field ospf_ospf_lsa_asext_fwdaddr
+		if ["5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][prefix_ip_fwdaddr]", getValueFromArray(fields["ospf_ospf_lsa_asext_fwdaddr"],ospf_ospf_lsa_asext_fwdaddr_index, false))
+			ospf_ospf_lsa_asext_fwdaddr_index += 1
+		end
+	
+		# handling field ospf_ospf_lsa_asext_extrttag
+		if ["5","7"].include?(lsa_type)
+			cloned_event.set("[ospf][ospf_external_tag]", getValueFromArray(fields["ospf_ospf_lsa_asext_extrttag"],ospf_ospf_lsa_asext_extrttag_index, false))
+			ospf_ospf_lsa_asext_extrttag_index += 1
 		end
 	
 		# handling field ospf_ospf_metric
 		if ["3","5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][ospf_metric]", fields["ospf_ospf_metric"][ospf_ospf_metric_index])
+			cloned_event.set("[ospf][ospf_metric]", getValueFromArray(fields["ospf_ospf_metric"],ospf_ospf_metric_index, false))
 			ospf_ospf_metric_index += 1
 		end
 	
 		# handling field ospf_ospf_v2_options_dn
 		if ["3","5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][lsa_down_bit]", fields["ospf_ospf_v2_options_dn"][ospf_ospf_v2_options_dn_index])
+			cloned_event.set("[ospf][lsa_down_bit]", getValueFromArray(fields["ospf_ospf_v2_options_dn"],ospf_ospf_v2_options_dn_index, false))
 			ospf_ospf_v2_options_dn_index += 1
 		end
 	
 		# handling field ospf_ospf_v2_options_e
 		if ["1","3","5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][lsa_external_bit]", fields["ospf_ospf_v2_options_e"][ospf_ospf_v2_options_e_index])
+			cloned_event.set("[ospf][lsa_external_bit]", getValueFromArray(fields["ospf_ospf_v2_options_e"],ospf_ospf_v2_options_e_index, false))
 			ospf_ospf_v2_options_e_index += 1
 		end
 	
 		# handling field ospf_ospf_lsa_asext_netmask
 		if ["5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][netmask]", fields["ospf_ospf_lsa_asext_netmask"][ospf_ospf_lsa_asext_netmask_index])
-			ospf_ospf_lsa_asext_netmask_index += 1
-		end
-	
-		# handling field ospf_ospf_lsa_asext_netmask
-		if ["5","7"].include?(lsa_type)
-			cloned_event.set("[ospf][metric_type]", fields["ospf_ospf_lsa_asext_type"][ospf_ospf_lsa_asext_type_index])
+			cloned_event.set("[ospf][metric_type]", getValueFromArray(fields["ospf_ospf_lsa_asext_type"],ospf_ospf_lsa_asext_type_index, false))
 			ospf_ospf_lsa_asext_type_index += 1
 		end
 
@@ -151,45 +188,13 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 	            end
 	           
 			end
-		
-        elsif lsa_type == "2"
-
-            # events.push(cloned_event)
-
-        elsif lsa_type == "3"
-
-            events.push(cloned_event)
-            
-            index_type_3 += 1
-
-        elsif lsa_type == "4"
-
-            # events.push(cloned_event)
-
-        elsif lsa_type == "5"
-
-            events.push(cloned_event)
-            
-        elsif lsa_type == "7"
-
-            # events.push(cloned_event)    
-
-        elsif lsa_type == "9"
-
-            # events.push(cloned_event)
 
         elsif lsa_type == "10"
-
-            # events.push(cloned_event)
-            
-            index_type_10 += 1
-
-        elsif lsa_type == "11"
-
-            # events.push(cloned_event)
-
-        else
-            logger.info("TYPE UNKNOWN")
+        	if current_lsa_opaque_type == "1"
+           		events.push(cloned_event)
+           	end
+        else 
+            events.push(cloned_event)
         end
 
         # remove fields because mapped into other fields
@@ -226,15 +231,19 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
  
   def renameCommonFields(cloned_event, event)
     cloned_event.set("[ospf][timestamp]" , event.get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
-	cloned_event.remove("[json_parsed][layers][frame][frame_frame_time_epoch]")
-	
 	cloned_event.set("[ospf][utc_time]" , event.get("[json_parsed][layers][frame][frame_frame_time]"))
-	cloned_event.remove("[json_parsed][layers][frame][frame_frame_time]")
-	
 	# ip address: x.y.z.t => area_id = (x * 16.777.216 + y * 65536 + z * 256 + t) 
 	area_id = event.get("[json_parsed][layers][ospf][ospf_ospf_area_id]").split(".").map { |i| i.to_i }.reverse.inject([]) { |memo,part| memo << part * (256 ** memo.size) }.inject(0) { |memo, part|memo += part }
 	cloned_event.set("[ospf][area_id]" , area_id)
-	cloned_event.remove("[json_parsed][layers][ospf][ospf_ospf_area_id]")
+  end
+ 
+  def renameType10OpaqueType1CommonFields(cloned_event, fields)
+    cloned_event.set("[ospf][adv_router]" , getValueFromArray(fields["ospf_ospf_mpls_routerid"],0, false))
+	cloned_event.set("[ospf][link_type]" , getValueFromArray(fields["ospf_ospf_mpls_linktype"],0, false))
+	cloned_event.set("[ospf][link-id]" , getValueFromArray(fields["ospf_ospf_mpls_linkid"],0, false))
+	cloned_event.set("[ospf][prefix-id]" , getValueFromArray(fields["ospf_ospf_mpls_local_addr"],0, false))
+	cloned_event.set("[ospf][te_metric]" , getValueFromArray(fields["ospf_ospf_mpls_te_metric"],0, false))
+	cloned_event.set("[ospf][mpls_linkcolor]" , getValueFromArray(fields["ospf_ospf_mpls_linkcolor"],0, true))
   end
 
   def setDefaultValues(cloned_event)
@@ -256,6 +265,14 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
     cloned_event.set("[ospf][extra]", "")
   end
  
+  def getValueFromArray(key_array,index,to_decimal)
+  	value = nil
+  	if key_array and index < key_array.length
+  		value = (to_decimal == false) ? key_array[index] : key_array[index].to_i(16)
+  	end
+  	return value
+  end
+ 
   def getArrayFromEvent(event, ospf_ospf_ls_number_of_lsas, key)
     # mutate fields in array if they are not an array, for example if number_of_lsas == 1
     array_event = nil
@@ -264,8 +281,10 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
       if [true, false].include? value
   	  	# boolean single value
   	  	array_event = [value]
+  	  elsif value.kind_of?(Array)
+  	  	array_event = value
   	  else
-  	  	array_event = ospf_ospf_ls_number_of_lsas == "1" ? value.split : value
+  	  	array_event = value.split
   	  end
   	end
   	return array_event
