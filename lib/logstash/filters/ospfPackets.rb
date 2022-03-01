@@ -51,7 +51,6 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 
     # initialize specific index for each field
     ospf_ospf_lsa_id_index = 0
-	ospf_ospf_lsid_opaque_type = 0
 	ospf_ospf_metric_index = 0
 	ospf_ospf_v2_options_dn_index = 0
 	ospf_ospf_v2_options_e_index = 0
@@ -62,13 +61,19 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 	ospf_ospf_lsid_opaque_type_index = 0
 	ospf_ospf_v2_options_p_index = 0
 	ospf_ospf_lsa_asbr_netmask_index = 0
+	# type 1 variables
+	ospf_ospf_lsa_number_of_links_index = 0
+	ospf_ospf_lsa_router_linktype_index = 0
+	ospf_ospf_lsa_router_linkdata_index = 0
+	ospf_ospf_lsa_router_linkid_index = 0
+	ospf_ospf_lsa_router_metric0_index = 0
     
     fields["ospf_ospf_lsa"].each_with_index do |lsa_type,lsa_index|
       
-        if ["1","2","4","9","11"].include?(lsa_type) 
+        if ["2","4","9","11"].include?(lsa_type) 
         	logger.info("SKIP EVENT TYPE:", "value" => lsa_type)
         	next
-       	end 
+       	end
        
         cloned_event = event.clone
       
@@ -84,6 +89,7 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
         
         setDefaultValues(cloned_event)
 
+		current_lsa_opaque_type = 0
 		# handling field ospf_ospf_lsid_opaque_type
 		if ["10"].include?(lsa_type)
 			cloned_event.set("[ospf][lsa_opaque_type]", getValueFromArray(fields["ospf_ospf_lsid_opaque_type"],ospf_ospf_lsid_opaque_type_index, false))
@@ -101,13 +107,12 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 			cloned_event.set("[ospf][adv_router]", getValueFromArray(fields["ospf_ospf_advrouter"],lsa_index.to_i, false))
 		end
 	
-		# handling field prefix-id
+		# handling field ospf_ospf_lsa_id
 		if ["1","3","5","7"].include?(lsa_type)
 			if ["3","5","7"].include?(lsa_type)
 		  	    cloned_event.set("[ospf][prefix-id]", getValueFromArray(fields["ospf_ospf_lsa_id"],ospf_ospf_lsa_id_index, false))
-			elsif lsa_type == "1"
 			end
-		    # incremented for all lsa_types
+		    # incremented also for lsa type 1, even if not used 
 		    ospf_ospf_lsa_id_index += 1
 		end
 
@@ -165,53 +170,74 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
 			ospf_ospf_lsa_asext_type_index += 1
 		end
 
-        if lsa_type == "1"
-
-            # LSA TYPE 1 must be cloned for each link
-            lsa_type1_link_index = 0
-            ospf_ospf_lsa_number_of_links = ospf_ospf_ls_number_of_lsas == "1" ? event.get("[json_parsed][layers][ospf][ospf_ospf_lsa_number_of_links]").split : event.get("[json_parsed][layers][ospf][ospf_ospf_lsa_number_of_links]")
-            
-            logger.info("ospf_ospf_lsa_number_of_links_group:", "value" => ospf_ospf_lsa_number_of_links.length)
-            ospf_ospf_lsa_number_of_links.each_with_index do |lsa_link_group, lsa_link_group_index|
-            	
-          		logger.info("ospf_ospf_lsa_number_of_links:", "value" => lsa_link_group)
-          		(1..lsa_link_group.to_i).each do |n|
-          			link_index = n - 1
-              		logger.info("link:", "value" => link_index)
-#        		        ospf_ospf_lsa_router_linkid = lsa_link_group == "1" ? event.get("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linkid]").split : event.get("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linkid]")
-
-	                # clone from cloned_event, not from original event
-	                cloned_event_type1 = cloned_event.clone()
-	
-	                lsa_type1_link_index = lsa_type1_link_index + 1
-	              
-	            end
-	           
-			end
-
-        elsif lsa_type == "10"
-        	if current_lsa_opaque_type == "1"
-           		events.push(cloned_event)
-           	end
-        else 
-            events.push(cloned_event)
-        end
-
         # remove fields because mapped into other fields
         removeUnusedFieldsAfterUsing(cloned_event)
         
+        if lsa_type == "1"
+
+            # LSA TYPE 1 must be cloned for each linkid
+            lsa_type1_link_index = 0
+            ospf_ospf_lsa_number_of_links = getValueFromArray(fields["ospf_ospf_lsa_number_of_links"],ospf_ospf_lsa_number_of_links_index, false)
+            ospf_ospf_lsa_number_of_links_index += 1
+            
+      		logger.info("ospf_ospf_lsa_number_of_links:", "value" => ospf_ospf_lsa_number_of_links)
+      		
+      		# LOOP FOR EACH LINKID 
+      		(1..ospf_ospf_lsa_number_of_links.to_i).each do |n|
+      			link_index = n - 1
+          		logger.info("link:", "value" => link_index)
+
+                # clone from cloned_event, not from original event
+                cloned_event_type1 = cloned_event.clone()
+
+				# handling field ospf_ospf_lsa_router_linktype
+				cloned_event_type1.set("[ospf][link_type]", getValueFromArray(fields["ospf_ospf_lsa_router_linktype"],ospf_ospf_lsa_router_linktype_index, false))
+				current_link_type = cloned_event_type1.get("[ospf][link_type]")
+				ospf_ospf_lsa_router_linktype_index += 1
+				
+				# handling field ospf_ospf_lsa_router_linkdata
+				current_linkdata = getValueFromArray(fields["ospf_ospf_lsa_router_linkdata"],ospf_ospf_lsa_router_linkdata_index, false)
+				ospf_ospf_lsa_router_linkdata_index += 1
+				
+				# handling field ospf_ospf_lsa_router_linkid
+				current_linkid = getValueFromArray(fields["ospf_ospf_lsa_router_linkid"],ospf_ospf_lsa_router_linkid_index, false)
+				ospf_ospf_lsa_router_linkid_index += 1
+				
+				# handling field prefix-id
+				if current_link_type == "1"
+					cloned_event_type1.set("[ospf][prefix-id]", current_linkdata)
+				elsif current_link_type == "2"
+					cloned_event_type1.set("[ospf][prefix-id]", current_linkid)
+				elsif current_link_type == "3"
+					cloned_event_type1.set("[ospf][prefix-id]", current_linkid)
+					cloned_event_type1.set("[ospf][netmask]", current_linkdata)
+				end
+				
+				# handling field ospf_ospf_lsa_router_metric0
+				cloned_event_type1.set("[ospf][ospf_metric]", getValueFromArray(fields["ospf_ospf_lsa_router_metric0"],ospf_ospf_lsa_router_metric0_index, false))
+				ospf_ospf_lsa_router_metric0_index += 1
+				
+                events.push(cloned_event_type1)
+                lsa_type1_link_index = lsa_type1_link_index + 1
+	        end
+	           
+        elsif lsa_type == "10" and current_lsa_opaque_type == "1"
+   			events.push(cloned_event)
+        elsif ["3","5","7"].include?(lsa_type)
+            events.push(cloned_event)
+        end
     end
     
-    logger.info("numero eventi generati:", "value" => events.length)
+    logger.info("events generated:", "value" => events.length)
 
     events.each do |r_event|
-      # If the user has generated a new event we yield that for them here
-      if event != r_event
-        yield r_event
-      else
-      	logger.info("original event parsed")
-      end
-      r_event
+        # If the user has generated a new event we yield that for them here
+        if event != r_event
+            yield r_event
+        else
+      	    logger.info("original event parsed")
+        end
+#         r_event
     end
   end # def filter
 
@@ -317,6 +343,7 @@ class LogStash::Filters::Ospfpackets < LogStash::Filters::Base
     fields["ospf_ospf_mpls_local_addr"] = getArrayFromEvent(event,ospf_ospf_ls_number_of_lsas,"[json_parsed][layers][ospf][ospf_ospf_mpls_local_addr]")
     fields["ospf_ospf_mpls_te_metric"] = getArrayFromEvent(event,ospf_ospf_ls_number_of_lsas,"[json_parsed][layers][ospf][ospf_ospf_mpls_te_metric]")
     fields["ospf_ospf_mpls_linkcolor"] = getArrayFromEvent(event,ospf_ospf_ls_number_of_lsas,"[json_parsed][layers][ospf][ospf_ospf_mpls_linkcolor]")
+    fields["ospf_ospf_lsa_number_of_links"] = getArrayFromEvent(event,ospf_ospf_ls_number_of_lsas,"[json_parsed][layers][ospf][ospf_ospf_lsa_number_of_links]")
     return fields
   end
  

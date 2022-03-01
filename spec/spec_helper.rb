@@ -20,7 +20,6 @@ require "logstash/devutils/rspec/spec_helper"
 def check_type_3(events, i, j)
 	expect(events[i].get("[ospf][timestamp]")).to eq(events[0].get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
 	expect(events[i].get("[ospf][utc_time]")).to eq(events[0].get("[json_parsed][layers][frame][frame_frame_time]"))
-	expect(events[i].get("[ospf][timestamp]")).to eq(events[0].get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
 	expect(events[i].get("[ospf][lsa_type]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_lsa]")[j])
 	expect(events[i].get("[ospf][lsa_age]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_lsa_age]")[j])
 	expect(events[i].get("[ospf][adv_router]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_advrouter]")[j])
@@ -30,4 +29,13 @@ def check_type_3(events, i, j)
 	expect(events[i].get("[ospf][lsa_down_bit]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_v2_options_dn]")[j])
 	expect(events[i].get("[ospf][lsa_external_bit]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_v2_options_e]")[j])
 	expect(events[i].get("[ospf][extra]")).to eq("")
+end
+
+def check_type_1(events, i, j)
+	expect(events[i].get("[ospf][timestamp]")).to eq(events[0].get("[json_parsed][layers][frame][frame_frame_time_epoch]"))
+	expect(events[i].get("[ospf][utc_time]")).to eq(events[0].get("[json_parsed][layers][frame][frame_frame_time]"))
+	expect(events[i].get("[ospf][lsa_type]")).to eq("1")
+	expect(events[i].get("[ospf][extra]")).to eq("")
+	expect(events[i].get("[ospf][ospf_metric]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_lsa_router_metric0]")[j])
+	expect(events[i].get("[ospf][link_type]")).to eq(events[0].get("[json_parsed][layers][ospf][ospf_ospf_lsa_router_linktype]")[j])
 end
